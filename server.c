@@ -566,6 +566,57 @@ static void put_playlist_remove_tracks(sp_playlist *playlist,
   free(tracks);
 }
 
+static void delete_playlist(sp_playlist *playlist,
+                               struct evhttp_request *request,
+                               void *userdata) {
+
+  sp_session *session = userdata;
+  // URI
+  size_t playlist_uri_len = strlen("spotify:user:") + strlen(username) + 
+                            strlen(":playlist:") +
+                            strlen("284on3DVWeAxWkgVuzZKGt") + 1;
+  char *playlist_uri = malloc(playlist_uri_len);
+
+  if (playlist_uri == NULL)
+    return;
+
+  sp_link *playlist_link = sp_link_create_from_playlist(playlist);
+  sp_link_as_string(playlist_link, playlist_uri, playlist_uri_len);
+  sp_link_release(playlist_link);
+
+  sp_playlistcontainer *pc = sp_session_playlistcontainer(session);
+
+  for (int i = 0; i < sp_playlistcontainer_num_playlists(pc); i++) {
+    sp_playlist *other_playlist = sp_playlistcontainer_playlist(pc, i);
+
+    if (!sp_playlist_is_loaded(other_playlist)) {// (tomm): Should be fine as the one we're deleting has already been loaded.
+      syslog(LOG_DEBUG, "Playlist not loaded, continuing\n");
+      continue;
+    }
+
+    char *other_playlist_uri = malloc(playlist_uri_len);
+
+    sp_link *other_playlist_link = sp_link_create_from_playlist(other_playlist);
+    sp_link_as_string(other_playlist_link, other_playlist_uri, playlist_uri_len);
+    sp_link_release(other_playlist_link);
+
+    if(strcmp(playlist_uri, other_playlist_uri) == 0) {
+      sp_playlistcontainer_remove_playlist(pc, i);
+
+      get_playlist(playlist, request, userdata);
+      free(other_playlist_uri);
+      free(playlist_uri);
+
+      return;
+    }
+
+    free(other_playlist_uri);
+  }
+
+  free(playlist_uri);
+  send_error(request, HTTP_NOTFOUND, "Playlist link not found");
+}
+
 static void put_playlist_patch(sp_playlist *playlist,
                                struct evhttp_request *request,
                                void *userdata) {
@@ -745,6 +796,7 @@ static void handle_request(struct evhttp_request *request,
     case EVHTTP_REQ_GET:
     case EVHTTP_REQ_PUT:
     case EVHTTP_REQ_POST:
+    case EVHTTP_REQ_DELETE:
       break;
 
     default:
@@ -868,6 +920,15 @@ static void handle_request(struct evhttp_request *request,
       }
     }
     break;
+
+    case EVHTTP_REQ_DELETE:
+      {
+        callback_userdata = session;
+        if (action == NULL) {
+          request_callback = &delete_playlist;
+        }
+      }
+      break;
   }
 
   free(uri);
