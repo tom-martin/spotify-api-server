@@ -566,7 +566,7 @@ static void put_playlist_remove_tracks(sp_playlist *playlist,
   free(tracks);
 }
 
-static void delete_playlist(sp_playlist *playlist,
+static void unsubscribe_playlist(sp_playlist *playlist,
                                struct evhttp_request *request,
                                void *userdata) {
 
@@ -796,7 +796,6 @@ static void handle_request(struct evhttp_request *request,
     case EVHTTP_REQ_GET:
     case EVHTTP_REQ_PUT:
     case EVHTTP_REQ_POST:
-    case EVHTTP_REQ_DELETE:
       break;
 
     default:
@@ -917,18 +916,12 @@ static void handle_request(struct evhttp_request *request,
       } else if (strncmp(action, "patch", 5) == 0) {
         callback_userdata = state;
         request_callback = &put_playlist_patch;
+      } else if (strncmp(action, "unsubscribe", 11) == 0) {
+        callback_userdata = session;
+        request_callback = &unsubscribe_playlist;
       }
     }
     break;
-
-    case EVHTTP_REQ_DELETE:
-      {
-        callback_userdata = session;
-        if (action == NULL) {
-          request_callback = &delete_playlist;
-        }
-      }
-      break;
   }
 
   free(uri);
