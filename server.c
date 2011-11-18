@@ -834,7 +834,6 @@ static void handle_request(struct evhttp_request *request,
 
   // Dispatch request
   char *action = strtok(NULL, "/");
-  free(uri);
 
   // Default request handler
   handle_playlist_fn request_callback = &not_implemented;
@@ -870,6 +869,8 @@ static void handle_request(struct evhttp_request *request,
     }
     break;
   }
+
+  free(uri);
 
   if (sp_playlist_is_loaded(playlist)) {
     request_callback(playlist, request, callback_userdata);
