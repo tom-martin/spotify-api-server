@@ -546,6 +546,13 @@ static void put_playlist_remove_tracks(sp_playlist *playlist,
     return;
   }
 
+  int num_tracks = count;
+  if (sp_playlist_is_loaded(playlist)) {
+    num_tracks = sp_playlist_num_tracks(playlist);
+  }
+
+  count = num_tracks < count ? num_tracks : count;
+
   int *tracks = calloc(count, sizeof(int));
 
   for (int i = 0; i < count; i++) 
