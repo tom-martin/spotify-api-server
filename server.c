@@ -546,31 +546,34 @@ static void put_playlist_remove_tracks(sp_playlist *playlist,
     return;
   }
 
-  int num_tracks = count;
   if (sp_playlist_is_loaded(playlist)) {
-    num_tracks = sp_playlist_num_tracks(playlist);
+    int num_tracks = sp_playlist_num_tracks(playlist);
+
+    count = (num_tracks - index) < count ? (num_tracks - index) : count;
   }
 
-  count = num_tracks < count ? num_tracks : count;
+  if(count > 0) {
+      int *tracks = calloc(count, sizeof(int));
 
-  int *tracks = calloc(count, sizeof(int));
+      for (int i = 0; i < count; i++) 
+        tracks[i] = index + i; 
 
-  for (int i = 0; i < count; i++) 
-    tracks[i] = index + i; 
+      struct playlist_handler *handler = register_playlist_callbacks(
+          playlist, request, &get_playlist,
+          &playlist_update_in_progress_callbacks, NULL);
+      sp_error remove_tracks_error = sp_playlist_remove_tracks(playlist, tracks, 
+                                                               count);
 
-  struct playlist_handler *handler = register_playlist_callbacks(
-      playlist, request, &get_playlist,
-      &playlist_update_in_progress_callbacks, NULL);
-  sp_error remove_tracks_error = sp_playlist_remove_tracks(playlist, tracks, 
-                                                           count);
+      if (remove_tracks_error != SP_ERROR_OK) {
+        sp_playlist_remove_callbacks(playlist, handler->playlist_callbacks, handler);
+        free(handler);
+        send_error_sp(request, HTTP_BADREQUEST, remove_tracks_error);
+      }
 
-  if (remove_tracks_error != SP_ERROR_OK) {
-    sp_playlist_remove_callbacks(playlist, handler->playlist_callbacks, handler);
-    free(handler);
-    send_error_sp(request, HTTP_BADREQUEST, remove_tracks_error);
+      free(tracks);
+  } else {
+    get_playlist(playlist, request, NULL);
   }
-
-  free(tracks);
 }
 
 static void unsubscribe_playlist(sp_playlist *playlist,
