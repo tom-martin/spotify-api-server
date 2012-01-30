@@ -576,6 +576,52 @@ static void put_playlist_remove_tracks(sp_playlist *playlist,
   }
 }
 
+static void put_playlist_update(sp_playlist *playlist,
+                               struct evhttp_request *request,
+                               void *userdata) {
+  sp_session *session = userdata;
+  json_error_t loads_error;
+  json_t *playlist_json = read_request_body_json(request, &loads_error);
+
+  if (playlist_json == NULL) {
+    send_error(request, HTTP_BADREQUEST,
+               loads_error.text ? loads_error.text : "Unable to parse JSON");
+    return;
+  }
+
+  // Parse playlist
+  if (!json_is_object(playlist_json)) {
+    send_error(request, HTTP_BADREQUEST, "Invalid playlist object");
+    return;
+  }
+
+  // Get title
+  json_t *title_json = json_object_get(playlist_json, "title");
+
+  if (title_json == NULL) {
+    json_decref(playlist_json);
+    send_error(request, HTTP_BADREQUEST,
+               "Invalid playlist update: title is missing");
+    return;
+  }
+
+  if (!json_is_string(title_json)) {
+    json_decref(playlist_json);
+    send_error(request, HTTP_BADREQUEST,
+               "Invalid playlist update: title is not a string");
+    return;
+  }
+
+  char title[kMaxPlaylistTitleLength];
+  strncpy(title, json_string_value(title_json), kMaxPlaylistTitleLength);
+  json_decref(playlist_json);
+
+  sp_playlist_rename(playlist, title);
+
+  register_playlist_callbacks(playlist, request, &get_playlist,
+                                &playlist_state_changed_callbacks, NULL);
+}
+
 static void unsubscribe_playlist(sp_playlist *playlist,
                                struct evhttp_request *request,
                                void *userdata) {
@@ -929,6 +975,8 @@ static void handle_request(struct evhttp_request *request,
       } else if (strncmp(action, "unsubscribe", 11) == 0) {
         callback_userdata = session;
         request_callback = &unsubscribe_playlist;
+      } else if (strncmp(action, "update", 6) == 0) {
+        request_callback = &put_playlist_update;
       }
     }
     break;
