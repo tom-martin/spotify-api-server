@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <svn_diff.h>
 #include <sys/queue.h>
 #include <syslog.h>
+#include <time.h>
 
 #include "constants.h"
 #include "diff.h"
@@ -1060,13 +1061,18 @@ static void logged_in(sp_session *session, sp_error error) {
 static void process_events(evutil_socket_t socket,
                            short what,
                            void *userdata) {
+  time_t start, stop;
   struct state *state = userdata;
   event_del(state->timer);
   int timeout = 0;
 
+  syslog(LOG_DEBUG, "Processing events");
+  time(&start);
   do {
     sp_session_process_events(state->session, &timeout);
   } while (timeout == 0);
+  time(&stop);
+  syslog(LOG_DEBUG, "Processed events in about %.0f seconds. \n", difftime(stop, start));
 
   state->next_timeout.tv_sec = timeout / 1000;
   state->next_timeout.tv_usec = (timeout % 1000) * 1000;
