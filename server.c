@@ -83,6 +83,7 @@ struct playlist_handler {
   sp_playlist_callbacks *playlist_callbacks;
   struct evhttp_request *request;
   handle_playlist_fn callback;
+  int start_time;
   void *userdata;
 };
 
@@ -154,14 +155,19 @@ static struct playlist_handler *register_playlist_callbacks(
   handler->callback = callback;
   handler->playlist_callbacks = playlist_callbacks;
   handler->userdata = userdata;
+  time(&handler->start_time);
   sp_playlist_add_callbacks(playlist, handler->playlist_callbacks, handler);
   return handler;
 }
 
 void playlist_dispatch(sp_playlist *playlist, void *userdata) {
+  int stop;
+  time(&stop);
   struct playlist_handler *handler = userdata;
   sp_playlist_remove_callbacks(playlist, handler->playlist_callbacks, handler);
   handler->playlist_callbacks = NULL;
+
+  syslog(LOG_DEBUG, "Dispatching playlist. Update took about %.0f seconds\n", difftime(stop, handler->start_time));
   handler->callback(playlist, handler->request, handler->userdata);
   free(handler);
 }
@@ -1066,13 +1072,14 @@ static void process_events(evutil_socket_t socket,
   event_del(state->timer);
   int timeout = 0;
 
-  syslog(LOG_DEBUG, "Processing events");
-  time(&start);
+//  syslog(LOG_DEBUG, "Processing events");
+//  time(&start);
   do {
     sp_session_process_events(state->session, &timeout);
   } while (timeout == 0);
-  time(&stop);
-  syslog(LOG_DEBUG, "Processed events in about %.0f seconds. \n", difftime(stop, start));
+//  time(&stop);
+//  syslog(LOG_DEBUG, "Processed events in about %.0f seconds. \n", difftime(stop, start));
+//  syslog(LOG_DEBUG, "Next process event timeout in %.0f seconds. \n", (float)timeout / 1000);
 
   state->next_timeout.tv_sec = timeout / 1000;
   state->next_timeout.tv_usec = (timeout % 1000) * 1000;
@@ -1080,7 +1087,7 @@ static void process_events(evutil_socket_t socket,
 }
 
 static void notify_main_thread(sp_session *session) {
-  syslog(LOG_DEBUG, "notify_main_thread\n");
+//  syslog(LOG_DEBUG, "notify_main_thread\n");
   struct state *state = sp_session_userdata(session);
   event_active(state->async, 0, 1);
 }
