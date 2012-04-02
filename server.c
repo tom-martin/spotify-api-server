@@ -1079,15 +1079,19 @@ static void process_events(evutil_socket_t socket,
   } while (timeout == 0);
 //  time(&stop);
 //  syslog(LOG_DEBUG, "Processed events in about %.0f seconds. \n", difftime(stop, start));
-//  syslog(LOG_DEBUG, "Next process event timeout in %.0f seconds. \n", (float)timeout / 1000);
 
-  state->next_timeout.tv_sec = timeout / 1000;
+  float timeout_secs = (float)timeout / 1000;
+  if(timeout_secs > 10) {
+    syslog(LOG_DEBUG, "Next process event timeout in %.0f seconds. \n", timeout_secs);
+  }
+
+  state->next_timeout.tv_sec = timeout_secs;
   state->next_timeout.tv_usec = (timeout % 1000) * 1000;
   evtimer_add(state->timer, &state->next_timeout);
 }
 
 static void notify_main_thread(sp_session *session) {
-//  syslog(LOG_DEBUG, "notify_main_thread\n");
+  syslog(LOG_DEBUG, "notify_main_thread\n");
   struct state *state = sp_session_userdata(session);
   event_active(state->async, 0, 1);
 }
@@ -1153,7 +1157,7 @@ int main(int argc, char **argv) {
   }
 
   // Log in to Spotify
-  sp_session_login(session, account.username, account.password, false);
+  sp_session_login(session, account.username, account.password, false, NULL);
 
   event_base_dispatch(state->event_base);
 
